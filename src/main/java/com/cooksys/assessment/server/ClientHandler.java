@@ -76,18 +76,21 @@ public class ClientHandler implements Runnable {
 						
 					case "disconnect":
 						String disconnect = "user <" + message.getUsername() + ">  has disconnected";
-						users.remove(message.getUsername());
+						
 						message.setContents(disconnect);
 						String dismessage = mapper.writeValueAsString(message);
 
-						log.info(disconnect);
+						log.info(disconnect); 
 						for (User everyone : users) {
 							PrintWriter receiver = new PrintWriter(
 									new OutputStreamWriter(everyone.getSocket().getOutputStream()));
 							receiver.write(dismessage);
 							receiver.flush();
+							if(everyone.getUsername().equals( message.getUsername())){
+								users.remove(everyone);
+								everyone.getSocket().close();
+							}
 						}
-						this.socket.close();
 						break;
 						
 					case "echo":
@@ -97,23 +100,24 @@ public class ClientHandler implements Runnable {
 						writer.flush();
 						break;
 						
-					case "broadcast":
+					case "broadcast": 
+
+						String broadmess = "user<"+message.getUsername()+"> broadcast (all) <"+message.getContents()+">";
+						message.setContents(broadmess);
 						String broadmessage = mapper.writeValueAsString(message);
-						log.info("user <{}> broadcast (all) <{}>", message.getUsername(), message.getContents());
+						log.info(broadmess);
 						for (User everyone : users) {
 							PrintWriter receiver = new PrintWriter(
 									new OutputStreamWriter(everyone.getSocket().getOutputStream()));
 							receiver.write(broadmessage);
 							receiver.flush();
 						}
-						writer.write(broadmessage);
-						writer.flush();
 						break;
 						
 					case "users":
 						String info = "currently connected users: ";
 						for (User user : users) {
-							info += user.getUsername() + " ";
+							info += "\n" + user.getUsername();
 						}
 						log.info(info);
 						message.setContents(info);
@@ -121,8 +125,6 @@ public class ClientHandler implements Runnable {
 						writer.write(newMessage);
 						writer.flush();
 						break;
-						
-					default:
 					}
 
 				}

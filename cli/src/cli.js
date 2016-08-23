@@ -3,6 +3,8 @@ import { words } from 'lodash'
 import { connect } from 'net'
 import { Message } from './Message'
 
+//  lodash _.words
+
 export const cli = vorpal()
 
 let username
@@ -34,14 +36,14 @@ cli
     const contents = rest.join(' ')
 
     if (command === 'disconnect') {
-      server.end(new Message({ username, command }).toJSON() + '\n')
+      server.end((new Message({ username, command }).toJSON() + '\n'))
     } else if (command === 'echo') {
       server.write(new Message({ username, command, contents }).toJSON() + '\n')
     } else if (command === 'users') {
       server.write(new Message({ username, command, contents }).toJSON() + '\n')
     } else if (command === 'broadcast') {
       server.write(new Message({ username, command, contents }).toJSON() + '\n')
-    } else if (command.includes('@')) {
+    } else if (command === '@') { // need to fix
       server.write(new Message({ username, command, contents }).toJSON() + '\n')
     } else {
       this.log(`Command <${command}> was not recognized`)

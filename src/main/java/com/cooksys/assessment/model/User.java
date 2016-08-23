@@ -7,7 +7,6 @@ public class User {
 	private Socket socket;
 	
 	public User(String username, Socket socket) {
-		super();
 		this.username = username;
 		this.socket = socket;
 	}
