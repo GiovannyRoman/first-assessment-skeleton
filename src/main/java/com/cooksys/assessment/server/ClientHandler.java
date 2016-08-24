@@ -6,18 +6,19 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.HashSet;
-
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.cooksys.assessment.model.Message;
 import com.cooksys.assessment.model.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ClientHandler implements Runnable {
 	private Logger log = LoggerFactory.getLogger(ClientHandler.class);
-	static HashSet<User> users = new HashSet<User>(); // store all users
+	static Set<User> users = Collections.synchronizedSet(new HashSet<User>());
 	private Socket socket;
 
 	public ClientHandler(Socket socket) {
@@ -34,16 +35,28 @@ public class ClientHandler implements Runnable {
 
 			while (!socket.isClosed()) { // need an try and catch for sockets
 											// closed
-
 				String raw = reader.readLine();
 				Message message = mapper.readValue(raw, Message.class);
 
 				switch (message.getCommand()) {
 				case "connect":
+					boolean doubleUser = false;
+
+					for (User body : users) {
+						if (body.getUsername().equals(message.getUsername())) {
+							doubleUser = true;
+							this.socket.close();
+						}
+					}
+					if (doubleUser == true) {
+						break;
+					}
+
 					String connect = Server.getTime() + " user <" + message.getUsername() + ">  has connected";
+					log.info(socket.toString());
 					users.add(new User(message.getUsername(), socket));
 					message.setContents(connect);
-					log.info(" user <{}> has connected", message.getUsername());
+					log.info(connect);
 					for (User everyone : users) {
 						PrintWriter receiver = new PrintWriter(
 								new OutputStreamWriter(everyone.getSocket().getOutputStream()));
@@ -56,24 +69,27 @@ public class ClientHandler implements Runnable {
 					String disconnect = Server.getTime() + " user <" + message.getUsername() + ">  has disconnected";
 					message.setContents(disconnect);
 
+					for (User everyone : users) {
+						PrintWriter receiver = new PrintWriter(
+								new OutputStreamWriter(everyone.getSocket().getOutputStream()));
+						receiver.write(mapper.writeValueAsString(message));
+						receiver.flush();
+					}
+
 					log.info(disconnect);
 					synchronized (this) {
 						for (User everyone : users) {
-							PrintWriter receiver = new PrintWriter(
-									new OutputStreamWriter(everyone.getSocket().getOutputStream()));
-							receiver.write(mapper.writeValueAsString(message));
-							receiver.flush();
 							if (everyone.getUsername().equals(message.getUsername())) {
 								if (users.remove(everyone)) {
 									everyone.getSocket().close();
 								}
 							}
 						}
+						break;
 					}
-					break;
 				case "echo":
-					String echoMessage = Server.getTime() + " user <" + message.getUsername() + "> echoed message <"
-							+ message.getContents() + ">";
+					String echoMessage = Server.getTime() + " user <" + message.getUsername() + "> echoed message: "
+							+ message.getContents();
 					log.info(echoMessage);
 					message.setContents(echoMessage);
 					writer.write(mapper.writeValueAsString(message));
@@ -81,8 +97,8 @@ public class ClientHandler implements Runnable {
 					break;
 
 				case "broadcast":
-					String broadmess = Server.getTime() + " user <" + message.getUsername() + "> broadcast (all) <"
-							+ message.getContents() + ">";
+					String broadmess = Server.getTime() + " user <" + message.getUsername() + "> broadcast (all): "
+							+ message.getContents();
 					message.setContents(broadmess);
 					log.info(broadmess);
 					for (User everyone : users) {
@@ -100,9 +116,10 @@ public class ClientHandler implements Runnable {
 					}
 					log.info(info);
 					message.setContents(info);
-					writer.write( mapper.writeValueAsString(message));
+					writer.write(mapper.writeValueAsString(message));
 					writer.flush();
 					break;
+
 				default:
 
 					if (message.getCommand().contains("@")) {
@@ -133,7 +150,7 @@ public class ClientHandler implements Runnable {
 						}
 						break;
 					} else {
-						String err = "This is an invalid command";
+						String err = "This is an invalid command.";
 						log.info(err);
 						message.setContents(err);
 						writer.write(mapper.writeValueAsString(message));
@@ -142,7 +159,7 @@ public class ClientHandler implements Runnable {
 					}
 				}
 			}
-		} catch (IOException e) { // socket closed
+		} catch (IOException |ConcurrentModificationException e) {
 			log.error("Something went wrong :/", e);
 		}
 	}

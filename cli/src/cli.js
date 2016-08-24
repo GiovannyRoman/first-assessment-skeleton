@@ -3,25 +3,30 @@ import { words } from 'lodash'
 import { connect } from 'net'
 import { Message } from './Message'
 
-//  lodash _.words
-
 export const cli = vorpal()
 
 let username
 let server
-let lastCommand
+let lastCommand = 'ok'
 cli
   .delimiter(cli.chalk['yellow']('ftd~$'))
 
 cli
-  .mode('connect <username> <ipaddress>')   //  could remove exit
+  .mode('connect <username> [ipaddress]')   //  could remove exit
   .delimiter(cli.chalk['green']('connected>'))
   .init(function (args, callback) {
     username = args.username
-    server = connect({ host: args.ipaddress, port: 8080 }, () => {
-      server.write(new Message({ username, command: 'connect' }).toJSON() + '\n')
-      callback()
-    })
+    if (args.ipaddress !== undefined) {
+      server = connect({ host: args.ipaddress, port: 8080 }, () => {
+        server.write(new Message({ username, command: 'connect' }).toJSON() + '\n')
+        callback()
+      })
+    } else {
+      server = connect({ host: 'localhost', port: 8080 }, () => {
+        server.write(new Message({ username, command: 'connect' }).toJSON() + '\n')
+        callback()
+      })
+    }
 
     server.on('data', (buffer) => {
       let output = Message.fromJSON(buffer)
@@ -41,7 +46,6 @@ cli
     })
 
     server.on('end', () => {
-      server.end((new Message({ username, command: 'disconnect' }).toJSON() + '\n'))
       cli.exec('exit')
     })
   })
@@ -63,7 +67,7 @@ cli
     } else if (command.includes('@')) {
       lastCommand = command
       server.write(new Message({ username, command, contents }).toJSON() + '\n')
-    } else if (lastCommand === 'disconnect' || lastCommand === 'echo' || lastCommand === 'users' || lastCommand === 'broadcast' || lastCommand.includes('@')) {
+    } else if (lastCommand === 'echo' || lastCommand === 'users' || lastCommand === 'broadcast' || lastCommand.includes('@')) {
       server.write(new Message({ username, command: lastCommand, contents: (command + contents) }).toJSON() + '\n')
     } else {
       this.log(`Command <${command}> was not recognized`)
