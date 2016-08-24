@@ -14,7 +14,7 @@ cli
   .delimiter(cli.chalk['yellow']('ftd~$'))
 
 cli
-  .mode('connect <username> <ipaddress>')
+  .mode('connect <username> <ipaddress>')   //  could remove exit
   .delimiter(cli.chalk['green']('connected>'))
   .init(function (args, callback) {
     username = args.username
@@ -41,6 +41,7 @@ cli
     })
 
     server.on('end', () => {
+      server.end((new Message({ username, command: 'disconnect' }).toJSON() + '\n'))
       cli.exec('exit')
     })
   })
