@@ -72,6 +72,5 @@ cli
     } else {
       this.log(`Command <${command}> was not recognized`)
     }
-
     callback()
   })
