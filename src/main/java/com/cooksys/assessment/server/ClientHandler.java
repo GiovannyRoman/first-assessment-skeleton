@@ -32,17 +32,23 @@ public class ClientHandler implements Runnable {
 			ObjectMapper mapper = new ObjectMapper();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
-
+			
 			while (!socket.isClosed()) {
 				String raw = reader.readLine();
 				Message message = mapper.readValue(raw, Message.class);
-
+				String time =LocalDateTime.now()+"";
+				
+				
 				switch (message.getCommand()) {
-				case "connect":  // O(n*n)
+				case "connect":  						// O(n*n)
 					
 					boolean doubleUser = false;  //check if duplicate username
 					for (User body : users) {
 						if (body.getUsername().equals(message.getUsername())) {
+							String duplicate = time + " Another user with the same username is in the group. Try another username";
+							message.setContents(duplicate);
+							writer.write(mapper.writeValueAsString(message));
+							writer.flush();
 							doubleUser = true;
 							this.socket.close();
 						}
@@ -51,7 +57,7 @@ public class ClientHandler implements Runnable {
 						break;
 					}
 
-					String connect = LocalDateTime.now() + " user <" + message.getUsername() + ">  has connected";
+					String connect = time + " user <" + message.getUsername() + ">  has connected";
 					users.add(new User(message.getUsername(), socket));
 					message.setContents(connect);
 					log.info(connect);
@@ -63,9 +69,10 @@ public class ClientHandler implements Runnable {
 					}
 					break;
 
-				case "disconnect": // O(n * n)
-					String disconnect = LocalDateTime.now() + " user <" + message.getUsername() + ">  has disconnected";
+				case "disconnect": // O(n)
+					String disconnect = time + " user <" + message.getUsername() + ">  has disconnected";
 					message.setContents(disconnect);
+					User unwanted = null;
 
 					for (User everyone : users) {
 						PrintWriter receiver = new PrintWriter(
@@ -74,25 +81,22 @@ public class ClientHandler implements Runnable {
 						receiver.flush();
 						
 						if (everyone.getUsername().equals(message.getUsername())) {
-							if (users.remove(everyone)) {
-								everyone.getSocket().close();
-							}
+							unwanted = everyone;
 						}
 					}
 
 					log.info(disconnect);
-					synchronized (this) {
-						for (User everyone : users) {
-							if (everyone.getUsername().equals(message.getUsername())) {
-								if (users.remove(everyone)) {
-									everyone.getSocket().close();
-								}
-							}
+
+					if (unwanted.getUsername().equals(message.getUsername())) {
+						if (users.remove(unwanted)) {
+							unwanted.getSocket().close();
 						}
-						break;
 					}
+					
+						break;
+
 				case "echo": // O(1)
-					String echoMessage = LocalDateTime.now() + " user <" + message.getUsername() + "> echoed message: "
+					String echoMessage = time + " user <" + message.getUsername() + "> echoed message: "
 							+ message.getContents();
 					log.info(echoMessage);
 					message.setContents(echoMessage);
@@ -101,7 +105,7 @@ public class ClientHandler implements Runnable {
 					break;
 
 				case "broadcast": // O(n)
-					String broadmess = LocalDateTime.now() + " user <" + message.getUsername() + "> broadcast (all): "
+					String broadmess = time + " user <" + message.getUsername() + "> broadcast (all): "
 							+ message.getContents();
 					message.setContents(broadmess);
 					log.info(broadmess);
@@ -114,7 +118,7 @@ public class ClientHandler implements Runnable {
 					break;
 
 				case "users": // O(n)
-					String info = LocalDateTime.now() + " currently connected users: ";
+					String info = time + " currently connected users: ";
 					for (User user : users) {
 						info += "\n" + user.getUsername();
 					}
@@ -132,7 +136,7 @@ public class ClientHandler implements Runnable {
 						boolean hasFriend = false;
 						for (User us : users) {
 							if (us.getUsername().equals(buddy)) {
-								String privateMessage = LocalDateTime.now() + " <" + message.getUsername()
+								String privateMessage = time + " <" + message.getUsername()
 										+ "> (whisper): " + message.getContents();
 								log.info(privateMessage);
 								hasFriend = true;
@@ -146,7 +150,7 @@ public class ClientHandler implements Runnable {
 							}
 						}
 						if (!hasFriend) {
-							String notFound = "User was not found";
+							String notFound = time +" User was not found";
 							log.info(notFound);
 							message.setContents(notFound);
 							writer.write(mapper.writeValueAsString(message));
@@ -154,7 +158,7 @@ public class ClientHandler implements Runnable {
 						}
 						break;
 					} else {
-						String err = "This is an invalid command.";
+						String err = time +" This is an invalid command.";
 						log.info(err);
 						message.setContents(err);
 						writer.write(mapper.writeValueAsString(message));

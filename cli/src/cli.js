@@ -8,6 +8,7 @@ export const cli = vorpal()
 let username
 let server
 let lastCommand = 'ok'
+
 cli
   .delimiter(cli.chalk['yellow']('ftd~$'))
 
